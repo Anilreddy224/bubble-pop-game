@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Falling Letters & Numbers Game</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #121212;
+            font-family: 'Arial Rounded MT Bold', 'Comic Sans MS', sans-serif;
+        }
+
+        #game-area {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .falling-item {
+            position: absolute;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
+            /* Smooth transformation for popping effect */
+            transition: transform 0.1s ease-out;
+        }
+
+        .falling-item:active {
+            transform: scale(1.4);
+        }
+
+        /* Start prompt banner */
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 999;
+            text-align: center;
+        }
+
+        #start-overlay button {
+            padding: 15px 30px;
+            font-size: 24px;
+            border: none;
+            border-radius: 50px;
+            background-color: #ff4081;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <h1>Tap to Start Playing!</h1>
+        <p>Touch falling items to hear them spoken out loud.</p>
+        <button id="start-btn">START</button>
+    </div>
+
+    <div id="game-area"></div>
+
+    <script>
+        const gameArea = document.getElementById('game-area');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        // Characters to spawn (A-Z and 0-9)
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        
+        // Vibrant colors array
+        const colors = [
+            '#FF355E', '#FD5B78', '#FF6037', '#FF9966', 
+            '#FFCC33', '#FFFF66', '#CCFF00', '#66FF66', 
+            '#50BFE6', '#FF6EFF', '#EE34D2', '#00E5FF'
+        ];
+
+        let gameInterval = null;
+
+        // Initialize Web Speech API
+        const synth = window.speechSynthesis;
+
+        function speak(text) {
+            // Cancel any current speech to play the new one instantly
+            synth.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;  // Slightly slower for clarity
+            utterance.pitch = 1.1; // Slightly higher/friendly tone
+            utterance.volume = 1.0; // Maximum volume
+
+            synth.speak(utterance);
+        }
+
+        function createFallingItem() {
+            const item = document.createElement('div');
+            item.classList.add('falling-item');
+
+            // Pick a random character
+            const char = characters.charAt(Math.floor(Math.random() * characters.length));
+            item.textContent = char;
+
+            // Styling: Random size, color, and starting X-position
+            const fontSize = Math.floor(Math.random() * 40) + 50; // Size between 50px and 90px
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const maxX = window.innerWidth - fontSize;
+            const startX = Math.max(0, Math.floor(Math.random() * maxX));
+
+            item.style.fontSize = `${fontSize}px`;
+            item.style.color = randomColor;
+            item.style.left = `${startX}px`;
+            item.style.top = `-100px`;
+
+            gameArea.appendChild(item);
+
+            // Falling Animation logic
+            let currentY = -100;
+            const speed = Math.random() * 2 + 1.5; // Random fall speed
+
+            function fall() {
+                if (!item.parentNode) return; // Stop if already popped
+
+                currentY += speed;
+                item.style.top = `${currentY}px`;
+
+                // Remove item if it goes past the screen bottom
+                if (currentY > window.innerHeight) {
+                    item.remove();
+                } else {
+                    requestAnimationFrame(fall);
+                }
+            }
+
+            requestAnimationFrame(fall);
+
+            // Touch/Click Handler
+            const handleTouch = (e) => {
+                e.preventDefault();
+                speak(char);       // Speak the character
+                item.remove();     // Remove the element from the screen
+            };
+
+            item.addEventListener('touchstart', handleTouch, { passive: false });
+            item.addEventListener('mousedown', handleTouch);
+        }
+
+        // Start Game
+        startBtn.addEventListener('click', () => {
+            startOverlay.style.display = 'none';
+
+            // Warm up speech synthesis engine for browsers requiring user action
+            speak('');
+
+            // Spawn new falling elements every 800 milliseconds
+            gameInterval = setInterval(createFallingItem, 800);
+        });
+    </script>
+</body>
+</html>
