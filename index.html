@@ -35,16 +35,16 @@
             height: 100%;
         }
 
-        /* On-screen Score / Level Indicator */
+        /* HUD - Top Left */
         #hud {
             position: absolute;
             top: 15px;
             left: 20px;
             color: #ffffff;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
             text-shadow: 2px 2px 6px rgba(0,0,0,0.6);
-            z-index: 10;
+            z-index: 100;
             pointer-events: none;
             background: rgba(0, 0, 0, 0.25);
             padding: 8px 18px;
@@ -52,7 +52,31 @@
             backdrop-filter: blur(4px);
         }
 
-        /* Large Toddler-Friendly Bubbles */
+        /* Desktop Close Button - Top Right */
+        #desktop-close-btn {
+            display: none; /* Shown via JS if desktop device */
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(255, 59, 48, 0.85);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 25px;
+            padding: 8px 18px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        #desktop-close-btn:hover {
+            background: rgba(255, 59, 48, 1);
+            transform: scale(1.05);
+        }
+
+        /* Bubbles */
         .bubble {
             position: absolute;
             display: flex;
@@ -117,6 +141,8 @@
 </head>
 <body>
 
+    <button id="desktop-close-btn">✖ Close Game</button>
+
     <div id="start-overlay">
         <h1 style="font-size: 2.5rem; margin-bottom: 10px;">🫧 Toddler Bubble Pop 🫧</h1>
         <p style="margin-bottom: 30px; opacity: 0.9;">Super gentle start! Pops speed up as you play.</p>
@@ -132,6 +158,7 @@
         const startBtn = document.getElementById('start-btn');
         const scoreEl = document.getElementById('score');
         const levelEl = document.getElementById('level');
+        const desktopCloseBtn = document.getElementById('desktop-close-btn');
 
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         const colors = [
@@ -143,11 +170,38 @@
         let audioCtx;
         const synth = window.speechSynthesis;
 
-        // Dynamic Speed Tracking Variables
         let poppedCount = 0;
-        let baseSpeed = 0.2; // Extremely slow start (~10–12 seconds to fall across the screen)
-        let spawnIntervalTime = 1500; // 2.5 seconds between initial spawns
+        let baseSpeed = 0.15;
+        let spawnIntervalTime = 2500;
         let spawnTimeoutId = null;
+
+        // Detect Laptop/Desktop vs Mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+        if (!isMobile) {
+            desktopCloseBtn.style.display = 'block';
+            desktopCloseBtn.addEventListener('click', () => {
+                window.close();
+                // Fallback if browser blocks script window close
+                setTimeout(() => {
+                    window.location.href = "https://www.google.com";
+                }, 100);
+            });
+        }
+
+        // Mobile Back Button Handling using History API
+        function setupMobileBackHandler() {
+            window.history.pushState({ page: 'game' }, 'Game', '');
+
+            window.addEventListener('popstate', (e) => {
+                const exit = confirm("Do you want to leave the game?");
+                if (exit) {
+                    window.history.back();
+                } else {
+                    window.history.pushState({ page: 'game' }, 'Game', '');
+                }
+            });
+        }
 
         function initAudio() {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -217,7 +271,6 @@
             const char = characters.charAt(Math.floor(Math.random() * characters.length));
             textSpan.textContent = char;
 
-            // Extra large sizes for toddlers (80px to 120px)
             const bubbleSize = Math.floor(Math.random() * 40) + 80;
             const textColor = colors[Math.floor(Math.random() * colors.length)];
             const maxX = window.innerWidth - bubbleSize;
@@ -235,9 +288,7 @@
             gameArea.appendChild(bubble);
 
             let currentY = -(bubbleSize + 20);
-            
-            // Uses current base speed with slight random variation
-            const speed = baseSpeed + (Math.random() * 0.05); 
+            const speed = baseSpeed + (Math.random() * 0.05);
 
             function fall() {
                 if (!bubble.parentNode) return;
@@ -260,13 +311,12 @@
                 speak(char);
                 bubble.remove();
 
-                // Increment score & increase speed smoothly every 5 pops
                 poppedCount++;
                 scoreEl.textContent = poppedCount;
 
                 if (poppedCount % 5 === 0) {
-                    baseSpeed = Math.min(baseSpeed + 0.08, 1.2); // Cap max speed
-                    spawnIntervalTime = Math.max(spawnIntervalTime - 150, 900); // Cap min spawn delay
+                    baseSpeed = Math.min(baseSpeed + 0.08, 1.2);
+                    spawnIntervalTime = Math.max(spawnIntervalTime - 150, 900);
                     
                     const level = Math.floor(poppedCount / 5) + 1;
                     levelEl.textContent = level;
@@ -277,7 +327,6 @@
             bubble.addEventListener('mousedown', handlePop);
         }
 
-        // Recursive Loop to dynamically adjust spawn timing
         function gameLoop() {
             createBubble();
             spawnTimeoutId = setTimeout(gameLoop, spawnIntervalTime);
@@ -287,6 +336,7 @@
             startOverlay.style.display = 'none';
             initAudio();
             speak('');
+            setupMobileBackHandler();
             gameLoop();
         });
     </script>
