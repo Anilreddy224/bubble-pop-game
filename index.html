@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Falling Letters & Numbers Game</title>
+    <title>Bubble Pop Game</title>
     <style>
         * {
             box-sizing: border-box;
@@ -17,8 +17,17 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            background-color: #121212;
-            font-family: 'Arial Rounded MT Bold', 'Comic Sans MS', sans-serif;
+            /* Undersea / Sky Bubble Theme Background */
+            background: linear-gradient(180deg, #1a2a6c, #b21f1f, #fdbb2d);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', sans-serif;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
         #game-area {
@@ -27,28 +36,45 @@
             height: 100%;
         }
 
-        .falling-item {
+        /* Bubbly Style */
+        .bubble {
             position: absolute;
-            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
             cursor: pointer;
             touch-action: manipulation;
-            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
-            /* Smooth transformation for popping effect */
-            transition: transform 0.1s ease-out;
+            
+            /* Glassy / Shiny Bubble Effect */
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.2) 60%, rgba(255, 255, 255, 0.4) 100%);
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.8),
+                        0 8px 15px rgba(0, 0, 0, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(2px);
+            
+            /* Gentle Wobble */
+            animation: floatWobble 2s ease-in-out infinite alternate;
         }
 
-        .falling-item:active {
-            transform: scale(1.4);
+        @keyframes floatWobble {
+            0% { transform: translateX(-5px) rotate(-3deg); }
+            100% { transform: translateX(5px) rotate(3deg); }
         }
 
-        /* Start prompt banner */
+        .bubble-text {
+            font-weight: 900;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Start overlay */
         #start-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(15, 23, 42, 0.85);
             color: #fff;
             display: flex;
             justify-content: center;
@@ -58,25 +84,30 @@
             text-align: center;
         }
 
-        #start-overlay button {
-            padding: 15px 30px;
-            font-size: 24px;
+        #start-btn {
+            padding: 18px 45px;
+            font-size: 26px;
             border: none;
             border-radius: 50px;
-            background-color: #ff4081;
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
             color: white;
             cursor: pointer;
             font-weight: bold;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 6px 20px rgba(0,114,255,0.4);
+            transition: transform 0.2s;
+        }
+
+        #start-btn:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
 <body>
 
     <div id="start-overlay">
-        <h1>Tap to Start Playing!</h1>
-        <p>Touch falling items to hear them spoken out loud.</p>
-        <button id="start-btn">START</button>
+        <h1 style="font-size: 2.5rem; margin-bottom: 10px;">🫧 Bubble Pop Game 🫧</h1>
+        <p style="margin-bottom: 30px; opacity: 0.9;">Tap bubbles to pop them & hear letters & numbers!</p>
+        <button id="start-btn">PLAY NOW</button>
     </div>
 
     <div id="game-area"></div>
@@ -86,67 +117,118 @@
         const startOverlay = document.getElementById('start-overlay');
         const startBtn = document.getElementById('start-btn');
 
-        // Characters to spawn (A-Z and 0-9)
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         
-        // Vibrant colors array
+        // Soft pastels & vibrant bubble colors
         const colors = [
-            '#FF355E', '#FD5B78', '#FF6037', '#FF9966', 
-            '#FFCC33', '#FFFF66', '#CCFF00', '#66FF66', 
-            '#50BFE6', '#FF6EFF', '#EE34D2', '#00E5FF'
+            '#FF6B6B', '#4ECDC4', '#FFE66D', '#FF8B94', 
+            '#A8E6CF', '#DCEDC1', '#FFD3B6', '#FFAAA5',
+            '#9B5DE5', '#F15BB5', '#00BBF9', '#00F5D4'
         ];
 
-        let gameInterval = null;
-
-        // Initialize Web Speech API
+        let audioCtx;
         const synth = window.speechSynthesis;
 
+        // Web Audio API Synth for Music & Pop Effects
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            startBackgroundMusic();
+        }
+
+        // Pop sound synthesis
+        function playPopSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.08);
+
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.08);
+        }
+
+        // Calming background melody generator
+        function startBackgroundMusic() {
+            const notes = [261.63, 293.66, 329.63, 392.00, 440.00]; // C, D, E, G, A
+            let noteIndex = 0;
+
+            setInterval(() => {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(notes[noteIndex % notes.length], audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0.03, audioCtx.currentTime); // Soft volume
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.8);
+
+                noteIndex = (noteIndex + 1) % notes.length;
+            }, 600);
+        }
+
         function speak(text) {
-            // Cancel any current speech to play the new one instantly
             synth.cancel();
-
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 0.9;  // Slightly slower for clarity
-            utterance.pitch = 1.1; // Slightly higher/friendly tone
-            utterance.volume = 1.0; // Maximum volume
-
+            utterance.rate = 0.85;
+            utterance.pitch = 1.2;
             synth.speak(utterance);
         }
 
-        function createFallingItem() {
-            const item = document.createElement('div');
-            item.classList.add('falling-item');
+        function createBubble() {
+            const bubble = document.createElement('div');
+            bubble.classList.add('bubble');
 
-            // Pick a random character
+            const textSpan = document.createElement('span');
+            textSpan.classList.add('bubble-text');
             const char = characters.charAt(Math.floor(Math.random() * characters.length));
-            item.textContent = char;
+            textSpan.textContent = char;
 
-            // Styling: Random size, color, and starting X-position
-            const fontSize = Math.floor(Math.random() * 40) + 50; // Size between 50px and 90px
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-            const maxX = window.innerWidth - fontSize;
-            const startX = Math.max(0, Math.floor(Math.random() * maxX));
+            // Bubble Sizing
+            const bubbleSize = Math.floor(Math.random() * 30) + 70; // 70px to 100px
+            const textColor = colors[Math.floor(Math.random() * colors.length)];
+            const maxX = window.innerWidth - bubbleSize;
+            const startX = Math.max(10, Math.floor(Math.random() * maxX));
 
-            item.style.fontSize = `${fontSize}px`;
-            item.style.color = randomColor;
-            item.style.left = `${startX}px`;
-            item.style.top = `-100px`;
+            bubble.style.width = `${bubbleSize}px`;
+            bubble.style.height = `${bubbleSize}px`;
+            bubble.style.left = `${startX}px`;
+            bubble.style.top = `-120px`;
 
-            gameArea.appendChild(item);
+            textSpan.style.fontSize = `${bubbleSize * 0.55}px`;
+            textSpan.style.color = textColor;
+            bubble.appendChild(textSpan);
 
-            // Falling Animation logic
-            let currentY = -100;
-            const speed = Math.random() * 2 + 1.5; // Random fall speed
+            gameArea.appendChild(bubble);
+
+            let currentY = -120;
+            // SLOW SPEED: Move down very gently
+            const speed = Math.random() * 0.4 + 0.4; 
 
             function fall() {
-                if (!item.parentNode) return; // Stop if already popped
+                if (!bubble.parentNode) return;
 
                 currentY += speed;
-                item.style.top = `${currentY}px`;
+                bubble.style.top = `${currentY}px`;
 
-                // Remove item if it goes past the screen bottom
                 if (currentY > window.innerHeight) {
-                    item.remove();
+                    bubble.remove();
                 } else {
                     requestAnimationFrame(fall);
                 }
@@ -154,26 +236,24 @@
 
             requestAnimationFrame(fall);
 
-            // Touch/Click Handler
-            const handleTouch = (e) => {
+            const handlePop = (e) => {
                 e.preventDefault();
-                speak(char);       // Speak the character
-                item.remove();     // Remove the element from the screen
+                playPopSound();
+                speak(char);
+                bubble.remove();
             };
 
-            item.addEventListener('touchstart', handleTouch, { passive: false });
-            item.addEventListener('mousedown', handleTouch);
+            bubble.addEventListener('touchstart', handlePop, { passive: false });
+            bubble.addEventListener('mousedown', handlePop);
         }
 
-        // Start Game
         startBtn.addEventListener('click', () => {
             startOverlay.style.display = 'none';
-
-            // Warm up speech synthesis engine for browsers requiring user action
+            initAudio();
             speak('');
-
-            // Spawn new falling elements every 800 milliseconds
-            gameInterval = setInterval(createFallingItem, 800);
+            
+            // Spawn a new slow bubble every 1.5 seconds
+            setInterval(createBubble, 1500);
         });
     </script>
 </body>
