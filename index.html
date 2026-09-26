@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Toddler Bubble Pop Game</title>
+    <title>Bubbly Letters Game</title>
     <style>
         * {
             box-sizing: border-box;
@@ -54,7 +54,7 @@
 
         /* Desktop Close Button - Top Right */
         #desktop-close-btn {
-            display: none; /* Shown via JS if desktop device */
+            display: none;
             position: absolute;
             top: 15px;
             right: 20px;
@@ -76,33 +76,33 @@
             transform: scale(1.05);
         }
 
-        /* Bubbles */
-        .bubble {
+        /* Standalone Bubbly Character Styling */
+        .falling-char {
             position: absolute;
+            cursor: pointer;
+            touch-action: manipulation;
+            font-weight: 900;
+            line-height: 1;
+            text-align: center;
             display: flex;
             justify-content: center;
             align-items: center;
-            border-radius: 50%;
-            cursor: pointer;
-            touch-action: manipulation;
             
-            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.25) 60%, rgba(255, 255, 255, 0.45) 100%);
-            box-shadow: inset 0 0 25px rgba(255, 255, 255, 0.9),
-                        0 8px 18px rgba(0, 0, 0, 0.25);
-            border: 3px solid rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(2px);
+            /* 3D Bubbly Text Effect */
+            text-shadow: 
+                -2px -2px 0 #fff,  
+                 2px -2px 0 #fff,
+                -2px  2px 0 #fff,
+                 2px  2px 0 #fff,
+                 0px  6px 12px rgba(0, 0, 0, 0.5);
             
-            animation: floatWobble 2.5s ease-in-out infinite alternate;
+            filter: drop-shadow(0px 8px 10px rgba(0, 0, 0, 0.3));
+            animation: floatWobble 2s ease-in-out infinite alternate;
         }
 
         @keyframes floatWobble {
-            0% { transform: translateX(-8px) rotate(-4deg); }
-            100% { transform: translateX(8px) rotate(4deg); }
-        }
-
-        .bubble-text {
-            font-weight: 900;
-            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+            0% { transform: scale(1) rotate(-3deg); }
+            100% { transform: scale(1.08) rotate(3deg); }
         }
 
         #start-overlay {
@@ -144,8 +144,8 @@
     <button id="desktop-close-btn">✖ Close Game</button>
 
     <div id="start-overlay">
-        <h1 style="font-size: 2.5rem; margin-bottom: 10px;">🫧 Toddler Bubble Pop 🫧</h1>
-        <p style="margin-bottom: 30px; opacity: 0.9;">Super gentle start! Pops speed up as you play.</p>
+        <h1 style="font-size: 2.5rem; margin-bottom: 10px;">✨ Bubbly Letters & Numbers ✨</h1>
+        <p style="margin-bottom: 30px; opacity: 0.9;">Tap falling letters & numbers to hear them spoken!</p>
         <button id="start-btn">PLAY NOW</button>
     </div>
 
@@ -162,17 +162,19 @@
 
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         const colors = [
-            '#FF6B6B', '#4ECDC4', '#FFE66D', '#FF8B94', 
-            '#A8E6CF', '#DCEDC1', '#FFD3B6', '#FFAAA5',
-            '#9B5DE5', '#F15BB5', '#00BBF9', '#00F5D4'
+            '#FF2A6D', '#05D54B', '#FFD700', '#FF7518', 
+            '#00F5D4', '#9B5DE5', '#F15BB5', '#00BBF9',
+            '#FF4365', '#3A86FF', '#FF007F', '#7000FF'
         ];
 
         let audioCtx;
         const synth = window.speechSynthesis;
 
         let poppedCount = 0;
-        let baseSpeed = 0.15;
-        let spawnIntervalTime = 2500;
+        
+        // Base speed & interval set to requested values
+        let baseSpeed = 1.25;
+        let spawnIntervalTime = 400;
         let spawnTimeoutId = null;
 
         // Detect Laptop/Desktop vs Mobile
@@ -182,18 +184,17 @@
             desktopCloseBtn.style.display = 'block';
             desktopCloseBtn.addEventListener('click', () => {
                 window.close();
-                // Fallback if browser blocks script window close
                 setTimeout(() => {
                     window.location.href = "https://www.google.com";
                 }, 100);
             });
         }
 
-        // Mobile Back Button Handling using History API
+        // Mobile Back Button Handling
         function setupMobileBackHandler() {
             window.history.pushState({ page: 'game' }, 'Game', '');
 
-            window.addEventListener('popstate', (e) => {
+            window.addEventListener('popstate', () => {
                 const exit = confirm("Do you want to leave the game?");
                 if (exit) {
                     window.history.back();
@@ -257,47 +258,42 @@
         function speak(text) {
             synth.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 0.8;
+            utterance.rate = 0.85;
             utterance.pitch = 1.2;
             synth.speak(utterance);
         }
 
-        function createBubble() {
-            const bubble = document.createElement('div');
-            bubble.classList.add('bubble');
+        function createFallingChar() {
+            const item = document.createElement('div');
+            item.classList.add('falling-char');
 
-            const textSpan = document.createElement('span');
-            textSpan.classList.add('bubble-text');
             const char = characters.charAt(Math.floor(Math.random() * characters.length));
-            textSpan.textContent = char;
+            item.textContent = char;
 
-            const bubbleSize = Math.floor(Math.random() * 40) + 80;
+            // Character Size & Color
+            const fontSize = Math.floor(Math.random() * 30) + 70; // 70px to 100px
             const textColor = colors[Math.floor(Math.random() * colors.length)];
-            const maxX = window.innerWidth - bubbleSize;
+            const maxX = window.innerWidth - fontSize - 20;
             const startX = Math.max(10, Math.floor(Math.random() * maxX));
 
-            bubble.style.width = `${bubbleSize}px`;
-            bubble.style.height = `${bubbleSize}px`;
-            bubble.style.left = `${startX}px`;
-            bubble.style.top = `-${bubbleSize + 20}px`;
+            item.style.fontSize = `${fontSize}px`;
+            item.style.color = textColor;
+            item.style.left = `${startX}px`;
+            item.style.top = `-${fontSize + 20}px`;
 
-            textSpan.style.fontSize = `${bubbleSize * 0.55}px`;
-            textSpan.style.color = textColor;
-            bubble.appendChild(textSpan);
+            gameArea.appendChild(item);
 
-            gameArea.appendChild(bubble);
-
-            let currentY = -(bubbleSize + 20);
-            const speed = baseSpeed + (Math.random() * 0.05);
+            let currentY = -(fontSize + 20);
+            const speed = baseSpeed + (Math.random() * 0.1);
 
             function fall() {
-                if (!bubble.parentNode) return;
+                if (!item.parentNode) return;
 
                 currentY += speed;
-                bubble.style.top = `${currentY}px`;
+                item.style.top = `${currentY}px`;
 
                 if (currentY > window.innerHeight) {
-                    bubble.remove();
+                    item.remove();
                 } else {
                     requestAnimationFrame(fall);
                 }
@@ -309,26 +305,26 @@
                 e.preventDefault();
                 playPopSound();
                 speak(char);
-                bubble.remove();
+                item.remove();
 
                 poppedCount++;
                 scoreEl.textContent = poppedCount;
 
                 if (poppedCount % 5 === 0) {
-                    baseSpeed = Math.min(baseSpeed + 0.08, 1.2);
-                    spawnIntervalTime = Math.max(spawnIntervalTime - 150, 900);
+                    baseSpeed = Math.min(baseSpeed + 0.08, 2.5);
+                    spawnIntervalTime = Math.max(spawnIntervalTime - 15, 200);
                     
-                    const level = Math.floor(poppedCount / 5) + 1;
-                    levelEl.textContent = level;
+                    const currentLevel = 1 + Math.floor(poppedCount / 5);
+                    levelEl.textContent = currentLevel;
                 }
             };
 
-            bubble.addEventListener('touchstart', handlePop, { passive: false });
-            bubble.addEventListener('mousedown', handlePop);
+            item.addEventListener('touchstart', handlePop, { passive: false });
+            item.addEventListener('mousedown', handlePop);
         }
 
         function gameLoop() {
-            createBubble();
+            createFallingChar();
             spawnTimeoutId = setTimeout(gameLoop, spawnIntervalTime);
         }
 
