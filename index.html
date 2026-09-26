@@ -35,6 +35,20 @@
             height: 100%;
         }
 
+        /* Red flash indicator on miss */
+        #miss-flash {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 15px;
+            background: rgba(255, 0, 0, 0.6);
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+            pointer-events: none;
+            z-index: 50;
+        }
+
         /* HUD - Top Left */
         #hud {
             position: absolute;
@@ -142,14 +156,15 @@
 <body>
 
     <button id="desktop-close-btn">✖ Close Game</button>
+    <div id="miss-flash"></div>
 
     <div id="start-overlay">
         <h1 style="font-size: 2.5rem; margin-bottom: 10px;">✨ Bubbly Letters & Numbers ✨</h1>
-        <p style="margin-bottom: 30px; opacity: 0.9;">Tap falling letters & numbers to hear them spoken!</p>
+        <p style="margin-bottom: 30px; opacity: 0.9;">Tap falling characters before they hit the ground!</p>
         <button id="start-btn">PLAY NOW</button>
     </div>
 
-    <div id="hud">Pops: <span id="score">0</span> | Speed Level: <span id="level">1</span></div>
+    <div id="hud">Score: <span id="score">0</span> | Speed Level: <span id="level">1</span></div>
     <div id="game-area"></div>
 
     <script>
@@ -159,6 +174,7 @@
         const scoreEl = document.getElementById('score');
         const levelEl = document.getElementById('level');
         const desktopCloseBtn = document.getElementById('desktop-close-btn');
+        const missFlash = document.getElementById('miss-flash');
 
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         const colors = [
@@ -170,14 +186,11 @@
         let audioCtx;
         const synth = window.speechSynthesis;
 
-        let poppedCount = 0;
-        
-        // Base speed & interval set to requested values
-        let baseSpeed = 1.25;
+        let currentScore = 0;
+        let baseSpeed = 4.25;
         let spawnIntervalTime = 400;
         let spawnTimeoutId = null;
 
-        // Detect Laptop/Desktop vs Mobile
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
 
         if (!isMobile) {
@@ -190,7 +203,6 @@
             });
         }
 
-        // Mobile Back Button Handling
         function setupMobileBackHandler() {
             window.history.pushState({ page: 'game' }, 'Game', '');
 
@@ -226,6 +238,33 @@
 
             osc.start();
             osc.stop(audioCtx.currentTime + 0.08);
+        }
+
+        // Low pitch sound when an item hits the bottom
+        function playMissSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.15);
+
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        }
+
+        function triggerMissFlash() {
+            missFlash.style.opacity = '1';
+            setTimeout(() => {
+                missFlash.style.opacity = '0';
+            }, 150);
         }
 
         function startBackgroundMusic() {
@@ -270,8 +309,7 @@
             const char = characters.charAt(Math.floor(Math.random() * characters.length));
             item.textContent = char;
 
-            // Character Size & Color
-            const fontSize = Math.floor(Math.random() * 30) + 70; // 70px to 100px
+            const fontSize = Math.floor(Math.random() * 30) + 70;
             const textColor = colors[Math.floor(Math.random() * colors.length)];
             const maxX = window.innerWidth - fontSize - 20;
             const startX = Math.max(10, Math.floor(Math.random() * maxX));
@@ -292,8 +330,16 @@
                 currentY += speed;
                 item.style.top = `${currentY}px`;
 
+                // Handle item reaching the bottom (Missed)
                 if (currentY > window.innerHeight) {
                     item.remove();
+                    
+                    // Decrease score on miss (capped at 0)
+                    currentScore = Math.max(0, currentScore - 1);
+                    scoreEl.textContent = currentScore;
+                    
+                    playMissSound();
+                    triggerMissFlash();
                 } else {
                     requestAnimationFrame(fall);
                 }
@@ -307,14 +353,14 @@
                 speak(char);
                 item.remove();
 
-                poppedCount++;
-                scoreEl.textContent = poppedCount;
+                currentScore++;
+                scoreEl.textContent = currentScore;
 
-                if (poppedCount % 5 === 0) {
+                if (currentScore % 5 === 0 && currentScore > 0) {
                     baseSpeed = Math.min(baseSpeed + 0.08, 2.5);
                     spawnIntervalTime = Math.max(spawnIntervalTime - 15, 200);
                     
-                    const currentLevel = 1 + Math.floor(poppedCount / 5);
+                    const currentLevel = 1 + Math.floor(currentScore / 5);
                     levelEl.textContent = currentLevel;
                 }
             };
